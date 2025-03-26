@@ -10,6 +10,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.util.Pair;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.web.context.support.WebApplicationContextUtils;
@@ -59,31 +60,43 @@ public class AdaptiveAuthenticationFilter implements Filter {
   public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) throws IOException, ServletException {
 
     HttpServletRequest req = (HttpServletRequest) request;
-    LOG.info("Starting adaptive auth validation for req : {}",  req.getRequestURI());
 
-    ApiDynamicsClient apiDynamicsClient = new ApiDynamicsClient(
-            req.getHeader("X-API-Dynamics-Client-Id"),
-            getRequestHeaders(req).asSingleValueMap(),
-            req.getRequestURI(),
-            req.getMethod()
-    );
-
-    Pair<HttpStatusCode, Map<String, Object>> adaptiveValidationResult = adaptiveAuthenticationService.validateAdaptiveApiClient(apiDynamicsClient);
-    HttpStatusCode httpStatusCode = adaptiveValidationResult.getFirst();
-
-    LOG.info("Adaptive Authentication Validation status : {}", httpStatusCode);
-
-    if (httpStatusCode.is2xxSuccessful()) {
+    // tend/serve CORS preflight checks
+    // doing this since AdaptiveAuthenticationFilter tris to validate a client
+    // before actually completing filter chain execution,
+    // so, because of that we have to look for OPTIONS request and
+    // attend it as it corresponds
+    if (HttpMethod.OPTIONS.matches(req.getMethod())) {
       chain.doFilter(request, response);
     } else {
-      ObjectMapper mapper = new ObjectMapper();
-      HttpServletResponse res = (HttpServletResponse) response;
-      res.setStatus(httpStatusCode.value());
-      res.setContentType(MediaType.APPLICATION_JSON_VALUE);
-      mapper.writeValue(res.getWriter(), adaptiveValidationResult.getSecond());
-    }
+      LOG.info("Starting adaptive auth validation for req : {}", req.getRequestURI());
 
-    LOG.info("Finishing an adaptive auth validation for req : {}", req.getRequestURI());
+      ApiDynamicsClient apiDynamicsClient = new ApiDynamicsClient(
+              req.getHeader("X-API-Dynamics-Client-Id"),
+              getRequestHeaders(req).asSingleValueMap(),
+              req.getRequestURI(),
+              req.getMethod()
+      );
+
+      Pair<HttpStatusCode, Map<String, Object>> adaptiveValidationResult = adaptiveAuthenticationService.validateAdaptiveApiClient(apiDynamicsClient);
+      HttpStatusCode httpStatusCode = adaptiveValidationResult.getFirst();
+
+      LOG.info("Adaptive Authentication Validation status : {}", httpStatusCode);
+
+      // if Api Client validation succeed, then  continue with regular flow
+      if (httpStatusCode.is2xxSuccessful()) {
+        chain.doFilter(request, response);
+      } else { // else respond with Api Client validation error from Adaptive Authentication Server
+        ObjectMapper mapper = new ObjectMapper();
+        HttpServletResponse res = (HttpServletResponse) response;
+        res.setStatus(httpStatusCode.value());
+        res.setContentType(MediaType.APPLICATION_JSON_VALUE);
+        res.setHeader("Access-Control-Allow-Origin", "*"); // CORS related, preflight checks
+        mapper.writeValue(res.getWriter(), adaptiveValidationResult.getSecond());
+      }
+
+      LOG.info("Finishing an adaptive auth validation for req : {}", req.getRequestURI());
+    }
   }
 
   @Override

@@ -47,12 +47,29 @@ public class AdaptiveAuthenticationService {
     }
 
     /**
+     * Performs a TOTP token generation by calling Apy Dynamics server enforcing API Client to generate it
+     * @param clientId - Api Client public key gotten from client request
+     * @param transactionId - Current transaction Id
+     * @return - Pair with Api Dynamics status and body
+     */
+    public Pair<HttpStatusCode, Map<String, Object>> generateApiClientTotp(String clientId, String transactionId) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setAccept(Collections.singletonList(MediaType.APPLICATION_JSON));
+        headers.add("X-API-Dynamics-Provider-Id", getProviderId());
+        headers.add("X-API-Dynamics-Client-Id", clientId);
+        HttpEntity<?> entity = new HttpEntity<>(headers);
+        ParameterizedTypeReference<Map<String, Object>> responseType = new ParameterizedTypeReference<>() {};
+        ResponseEntity<Map<String, Object>> response = restTemplate.exchange("/totp/client/generate?tid={transactionId}", HttpMethod.GET, entity, responseType, transactionId);
+        return Pair.of(response.getStatusCode(), response.getBody());
+    }
+
+    /**
      * Performs a TOTP token validation by calling Apy Dynamics server
      * @param transactionId - Current transaction Id
      * @param totp - Actual TOTP token, could be self or server generated
      * @return - Pair with Api Dynamics status and body
      */
-    public Pair<HttpStatusCode, Map<String, Object>> validateAdaptiveApiClientTotp(String transactionId, String totp) {
+    public Pair<HttpStatusCode, Map<String, Object>> validateApiClientTotp(String transactionId, String totp) {
         HttpHeaders headers = new HttpHeaders();
         headers.setAccept(Collections.singletonList(MediaType.APPLICATION_JSON));
         headers.add("X-API-Dynamics-Provider-Id", getProviderId());

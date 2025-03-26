@@ -64,6 +64,6 @@ aws --profile {PROFILE} ecr get-login-password --regionn {REGION} | docker login
 ```
 export DOCKER_DEFAULT_PLATFORM=linux/amd64
 docker build --pull --no-cache --platform="linux/amd64" --provenance=false -t server-demo:latest -f Dockerfile.k8s .
-docker tag server-demo:latest 071215964715.dkr.ecr.us-west-2.amazonaws.com/shs-common-backend:java_server_demo_008
-docker push 071215964715.dkr.ecr.us-west-2.amazonaws.com/shs-common-backend:java_server_demo_008
+docker tag server-demo:latest 071215964715.dkr.ecr.us-west-2.amazonaws.com/shs-common-backend:java_server_demo_011
+docker push 071215964715.dkr.ecr.us-west-2.amazonaws.com/shs-common-backend:java_server_demo_011
 ```
